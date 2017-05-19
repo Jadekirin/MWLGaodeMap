@@ -32,7 +32,7 @@
     [super viewDidLoad];
     
 //    //创建地图
-//    [self setMapView];
+    [self setMapView];
 }
 
 - (void)setMapView{
