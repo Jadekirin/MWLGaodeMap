@@ -35,13 +35,16 @@
     self.locationArray = [NSMutableArray array];
     [self setMapView];
 //    [self setSearchMap];
+    //初始化Search
+    self.search = [[AMapSearchAPI alloc] init];
+    self.search.delegate = self;
     [self SetSearchTextField];
 }
 
 - (void)SetSearchTextField{
     
-    UIView *titleView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 200, 35)];//allocate titleView
-//    UIColor *color =  self.navigationController.navigationBar.tintColor;
+    UIView *titleView = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 200, 35)];
+    
     [titleView setBackgroundColor:[UIColor clearColor]];
     
     UISearchBar *searchBar = [[UISearchBar alloc] init];
@@ -52,32 +55,25 @@
     searchBar.layer.masksToBounds = YES;
 //    [titleView addSubview:searchBar];
     
-    //Set to titleView
     self.navigationItem.titleView = searchBar;
     
-    
-//    CGFloat W = 200;
-//    UITextField *searchField = [[UITextField alloc] initWithFrame:CGRectMake((kScreenWidth - W)/2, 80, W, 40)];
-//    searchField.backgroundColor = [UIColor clearColor];
-//    searchField.layer.borderColor = [UIColor grayColor].CGColor;
-//    searchField.layer.borderWidth = 1.0;
-//    searchField.placeholder = @"🔍输入要搜索的地点";
-//    
-//    [self.mapView addSubview:searchField];
 }
 
 - (void)searchBarSearchButtonClicked:(UISearchBar *)searchBar{
     
     [searchBar resignFirstResponder];
-    [self setSearchMap:searchBar.text];
+    //根据关键字检索
+//    [self setSearchMap:searchBar.text];
+    //检索周边POI
+    [self RetrieveSurroundingPOI:searchBar.text];
     
 }
 
 
 
+#pragma mark - 根据关键字检索POI
 - (void)setSearchMap:(NSString*)keywords{
-    self.search = [[AMapSearchAPI alloc] init];
-    self.search.delegate = self;
+   
     
     AMapPOIKeywordsSearchRequest *request = [[AMapPOIKeywordsSearchRequest alloc] init];
     
@@ -96,21 +92,55 @@
     [self.search AMapPOIKeywordsSearch:request];
 }
 
+#pragma mark - 检索周边POI
+- (void)RetrieveSurroundingPOI:(NSString *)keywords{
+    AMapPOIAroundSearchRequest *request = [[AMapPOIAroundSearchRequest alloc] init];
+    
+    request.location            = [AMapGeoPoint locationWithLatitude:31.302499 longitude:121.516750];
+    request.keywords            = keywords;
+    /* 按照距离排序. */
+    request.sortrule            = 0;
+    request.requireExtension    = YES;
+    request.requireSubPOIs      = YES;
+    
+    //发起周边检索
+    [self.search AMapPOIAroundSearch:request];
+}
+
+
 /* POI 搜索回调. */
 - (void)onPOISearchDone:(AMapPOISearchBaseRequest *)request response:(AMapPOISearchResponse *)response
 {
+    //清空地图  移除大头针
+    [self.mapView removeOverlays:self.mapView.overlays];
+    [self.mapView removeAnnotations:self.mapView.annotations];
+    
     if (response.pois.count == 0)
     {
         return;
     }else{
-        self.dataArray = response.pois;
-        [self setTableView];
+        //关键字检索POI
+//        self.dataArray = response.pois;
+//        [self setTableView];
+        //检索周边POI
+         CLLocationCoordinate2D coordinate;
+        for ( AMapPOI *pois in response.pois) {
+           
+            coordinate.latitude = pois.location.latitude;
+            coordinate.longitude = pois.location.longitude;
+            self.pointAnnotaiton = [[MAPointAnnotation alloc] init];
+            [self.pointAnnotaiton setCoordinate:coordinate];
+            [self.pointAnnotaiton setTitle:pois.name];
+            [self.pointAnnotaiton setSubtitle:pois.address];
+            [self.mapView addAnnotation:self.pointAnnotaiton];
+            
+        }
+        
+        [self.mapView setCenterCoordinate:CLLocationCoordinate2DMake(31.302499, 121.516750)];
     }
     
     //解析response获取POI信息，具体解析见 Demo
 }
-
-
 
 #pragma mark - TableView
 - (void)setTableView{
@@ -172,6 +202,7 @@
 
 - (MAAnnotationView *)mapView:(MAMapView *)mapView viewForAnnotation:(id<MAAnnotation>)annotation
 {
+    
     //大头针
     if ([annotation isKindOfClass:[MAPointAnnotation class]])
     {
